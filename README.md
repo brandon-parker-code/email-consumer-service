@@ -1,4 +1,4 @@
-# Email Consumer Service
+# Email-Consumer-Service
 
 A .NET 10 service that consumes email requests from a Kafka topic and sends them via SendGrid, with automatic SMTP fallback when SendGrid fails. It also exposes a versioned HTTP API for publishing messages onto the topic.
 
