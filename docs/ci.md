@@ -18,12 +18,12 @@ The GitOps write updates [`apps/prod/email-consumer-service/values.yaml`](https:
 On **email-consumer-service**:
 
 1. Create Environment **`prod`** (Settings → Environments). The Azure federated credential subject is `repo:brandon-parker-code/email-consumer-service:environment:prod`.
-2. Secrets (names must match exactly; do not prefix with `GITHUB_`):
+2. Environment **`prod`** (or repository) **variables** — names must match exactly; do not prefix with `GITHUB_`:
    - `AZURE_CLIENT_ID` — Terraform output `AZURE_CLIENT_ID`
    - `AZURE_TENANT_ID` — Terraform output `AZURE_TENANT_ID`
    - `AZURE_SUBSCRIPTION_ID` — Terraform output `AZURE_SUBSCRIPTION_ID`
-   - `GITOPS_TOKEN` — fine-grained PAT (or GitHub App token) with **Contents: Read and write** on `email-consumer-service-gitops`
-3. Variable:
    - `ACR_LOGIN_SERVER` — Terraform output `ACR_LOGIN_SERVER` (example: `acrecsprodxxxx.azurecr.io`)
+3. Repository **secret**:
+   - `GITOPS_TOKEN` — fine-grained PAT with **Contents: Read and write** on `email-consumer-service-gitops`
 
 `terraform apply` must succeed before the first image push. Until then, tests still run on PRs.
