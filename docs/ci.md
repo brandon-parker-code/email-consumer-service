@@ -23,7 +23,7 @@ On **email-consumer-service**:
    - `AZURE_TENANT_ID` — Terraform output `AZURE_TENANT_ID`
    - `AZURE_SUBSCRIPTION_ID` — Terraform output `AZURE_SUBSCRIPTION_ID`
    - `ACR_LOGIN_SERVER` — Terraform output `ACR_LOGIN_SERVER` (example: `acrecsprodxxxx.azurecr.io`)
-3. Repository **secret**:
-   - `GITOPS_TOKEN` — fine-grained PAT with **Contents: Read and write** on `email-consumer-service-gitops`
+3. Environment **`prod`** (or repository) **secret**:
+   - `GITOPS_TOKEN` — fine-grained PAT with **Contents: Read and write** on `email-consumer-service-gitops`. Must be a **secret**, not a variable.
 
 `terraform apply` must succeed before the first image push. Until then, tests still run on PRs.
