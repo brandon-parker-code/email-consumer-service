@@ -1,0 +1,114 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  IMAGE_NAME: email-consumer-service
+  GITOPS_REPO: brandon-parker-code/email-consumer-service-gitops
+  GITOPS_VALUES_PATH: apps/prod/email-consumer-service/values.yaml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Test
+        run: dotnet test EmailConsumerService.Tests/EmailConsumerService.Tests.csproj -c Release --verbosity minimal
+
+  build-and-push:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: prod
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image metadata
+        id: meta
+        run: |
+          SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          echo "tag=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image=${{ vars.ACR_LOGIN_SERVER }}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR
+        run: |
+          ACR_NAME="$(echo "${{ vars.ACR_LOGIN_SERVER }}" | cut -d. -f1)"
+          az acr login --name "$ACR_NAME"
+
+      - name: Build and push
+        run: |
+          IMAGE="${{ steps.meta.outputs.image }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          docker build -t "${IMAGE}:${TAG}" -t "${IMAGE}:${GITHUB_SHA}" .
+          docker push "${IMAGE}:${TAG}"
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            docker tag "${IMAGE}:${TAG}" "${IMAGE}:${GITHUB_REF_NAME}"
+            docker push "${IMAGE}:${GITHUB_REF_NAME}"
+          fi
+
+  update-gitops:
+    needs: build-and-push
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: gitops
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Bump image tag
+        env:
+          IMAGE: ${{ vars.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}
+          TAG: ${{ needs.build-and-push.outputs.image_tag }}
+        run: |
+          VALUES="gitops/${GITOPS_VALUES_PATH}"
+          yq -i ".image.repository = strenv(IMAGE) | .image.tag = strenv(TAG)" "$VALUES"
+          echo "Updated ${VALUES}:"
+          yq '.image' "$VALUES"
+
+      - name: Commit and push
+        working-directory: gitops
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${GITOPS_VALUES_PATH}"
+          if git diff --staged --quiet; then
+            echo "No GitOps change"
+            exit 0
+          fi
+          git commit -m "release: ${IMAGE_NAME}:${{ needs.build-and-push.outputs.image_tag }}"
+          git push
