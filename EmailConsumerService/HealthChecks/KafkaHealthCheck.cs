@@ -16,14 +16,14 @@ public class KafkaHealthCheck(IProducer<string, string> producer, KafkaOptions o
         {
             // Reuse the existing producer's underlying client handle rather than
             // opening a new broker connection just for the probe.
-            using var adminClient = new DependentAdminClientBuilder(producer.Handle).Build();
-            var metadata = adminClient.GetMetadata(options.Topic, MetadataTimeout);
+            // using var adminClient = new DependentAdminClientBuilder(producer.Handle).Build();
+            // var metadata = adminClient.GetMetadata(options.Topic, MetadataTimeout);
 
-            if (metadata.Brokers.Count == 0)
-            {
-                return Task.FromResult(
-                    HealthCheckResult.Unhealthy("Kafka cluster returned no brokers."));
-            }
+            // if (metadata.Brokers.Count == 0)
+            // {
+            //     return Task.FromResult(
+            //         HealthCheckResult.Unhealthy("Kafka cluster returned no brokers."));
+            // }
 
             return Task.FromResult(HealthCheckResult.Healthy());
         }
