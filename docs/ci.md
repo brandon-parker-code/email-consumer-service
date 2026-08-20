@@ -4,14 +4,23 @@ Workflow: [`.github/workflows/build-and-release.yml`](../.github/workflows/build
 
 ## What it does
 
-| Event | Test | Build/push ACR | Bump GitOps `image.tag` |
+| Event | Test | Build/push ACR | Bump GitOps `image.tag` (Flux deploys) |
 | --- | --- | --- | --- |
-| Pull request to `main` | yes | no | no |
-| Push to `main`, tags `v*`, or workflow_dispatch | yes | yes | yes |
+| Push to a feature branch | yes | no | no |
+| Pull request | yes | no | no |
+| Push to `main` | yes | yes | no |
+| **Run workflow** (`workflow_dispatch`) | yes | yes | yes |
+| Push a `v*` tag | yes | yes | yes |
+
+A branch with an open PR may run tests twice (push + `pull_request`). That is expected.
 
 Image tags: 7-character git SHA (GitHub short SHA), full SHA, and the git tag name when the run is a `v*` tag.
 
-The GitOps write updates [`apps/prod/email-consumer-service/values.yaml`](https://github.com/brandon-parker-code/email-consumer-service-gitops/blob/main/apps/prod/email-consumer-service/values.yaml) (`image.repository` and `image.tag`). Flux (next phase) reconciles that file.
+AKS only changes after GitOps `image.tag` is updated. Flux then pulls that image automatically. A commit to `main` builds and pushes to ACR; it does **not** deploy.
+
+To deploy: GitHub → **email-consumer-service** → Actions → **Build and release** → **Run workflow** → choose `main` (or the commit) → Run.
+
+The GitOps write updates [`apps/prod/email-consumer-service/values.yaml`](https://github.com/brandon-parker-code/email-consumer-service-gitops/blob/main/apps/prod/email-consumer-service/values.yaml) (`image.repository` and `image.tag`).
 
 ## One-time GitHub setup
 
@@ -26,4 +35,4 @@ On **email-consumer-service**:
 3. Environment **`prod`** (or repository) **secret**:
    - `GITOPS_TOKEN` — fine-grained PAT with **Contents: Read and write** on `email-consumer-service-gitops`. Must be a **secret**, not a variable.
 
-`terraform apply` must succeed before the first image push. Until then, tests still run on PRs.
+`terraform apply` must succeed before the first image push. Until then, tests still run on PRs and feature branches.
