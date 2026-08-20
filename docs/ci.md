@@ -38,4 +38,4 @@ On **email-consumer-service**:
 3. Environment **`prod`** (or repository) **secret**:
    - `GITOPS_TOKEN` — fine-grained PAT with **Contents: Read and write** on `email-consumer-service-gitops`. Must be a **secret**, not a variable.
 
-`terraform apply` must succeed before the first image push. Until then, tests still run on PRs and feature branches.
+`terraform apply` in [platform-terraform](https://github.com/brandon-parker-code/platform-terraform) must succeed before the first image push. Until then, tests still run on PRs and feature branches.
