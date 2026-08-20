@@ -9,7 +9,7 @@ Workflow: [`.github/workflows/build-and-release.yml`](../.github/workflows/build
 | Push to a feature branch | yes | no | no |
 | Pull request | yes | no | no |
 | Push to `main` | yes | yes | no |
-| **Run workflow** (`workflow_dispatch`) | yes | yes | yes |
+| **Run workflow** (`workflow_dispatch`) | no | no | yes (existing ACR image only) |
 | Push a `v*` tag | yes | yes | yes |
 
 A branch with an open PR may run tests twice (push + `pull_request`). That is expected.
@@ -18,7 +18,7 @@ Image tags: 7-character git SHA (GitHub short SHA), full SHA, and the git tag na
 
 AKS only changes after GitOps `image.tag` is updated. Flux then pulls that image automatically. A commit to `main` builds and pushes to ACR; it does **not** deploy.
 
-To deploy: GitHub → **email-consumer-service** → Actions → **Build and release** → **Run workflow** → choose `main` (or the commit) → Run.
+To deploy: GitHub → **email-consumer-service** → Actions → **Build and release** → **Run workflow** → choose `main` (the commit whose image is already in ACR) → Run. That job does **not** rebuild. It checks that `email-consumer-service:<7-char-sha>` exists in ACR, then updates GitOps. If the image is missing, the job fails.
 
 The GitOps write updates [`apps/prod/email-consumer-service/values.yaml`](https://github.com/brandon-parker-code/email-consumer-service-gitops/blob/main/apps/prod/email-consumer-service/values.yaml) (`image.repository` and `image.tag`).
 
