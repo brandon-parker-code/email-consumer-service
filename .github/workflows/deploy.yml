@@ -1,79 +1,19 @@
-name: Build
+name: Deploy
 
 on:
-  push:
-    branches: ["**"]
-    tags: ["v*"]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
 
 env:
-  DOTNET_VERSION: "10.0.x"
   IMAGE_NAME: email-consumer-service
   GITOPS_REPO: brandon-parker-code/email-consumer-service-gitops
   GITOPS_VALUES_PATH: apps/prod/email-consumer-service/values.yaml
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Test
-        run: dotnet test EmailConsumerService.Tests/EmailConsumerService.Tests.csproj -c Release --verbosity minimal
-
-  build-and-push:
-    needs: test
-    if: >
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
-    runs-on: ubuntu-latest
-    environment: prod
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Image metadata
-        id: meta
-        run: |
-          SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
-          echo "tag=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "image=${{ vars.ACR_LOGIN_SERVER }}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
-
-      - name: Azure login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID || secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID || secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Log in to ACR
-        run: |
-          ACR_NAME="$(echo "${{ vars.ACR_LOGIN_SERVER }}" | cut -d. -f1)"
-          az acr login --name "$ACR_NAME"
-
-      - name: Build and push
-        run: |
-          IMAGE="${{ steps.meta.outputs.image }}"
-          TAG="${{ steps.meta.outputs.tag }}"
-          docker build -t "${IMAGE}:${TAG}" -t "${IMAGE}:${GITHUB_SHA}" .
-          docker push "${IMAGE}:${TAG}"
-          docker push "${IMAGE}:${GITHUB_SHA}"
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            docker tag "${IMAGE}:${TAG}" "${IMAGE}:${GITHUB_REF_NAME}"
-            docker push "${IMAGE}:${GITHUB_REF_NAME}"
-          fi
-
   update-gitops:
-    needs: build-and-push
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     environment: prod
     steps:
@@ -82,6 +22,20 @@ jobs:
         run: |
           SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
           echo "tag=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID || secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID || secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Confirm image exists in ACR
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          ACR_NAME="$(echo "${{ vars.ACR_LOGIN_SERVER }}" | cut -d. -f1)"
+          az acr repository show --name "$ACR_NAME" --image "${IMAGE_NAME}:${TAG}"
 
       - name: Checkout GitOps repo
         uses: actions/checkout@v4
