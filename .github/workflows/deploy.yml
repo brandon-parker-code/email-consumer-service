@@ -2,6 +2,15 @@ name: Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Target GitHub Environment and GitOps overlay (apps/<env>/)
+        type: choice
+        required: true
+        default: prod
+        options:
+          - dev
+          - prod
 
 permissions:
   contents: read
@@ -10,12 +19,13 @@ permissions:
 env:
   IMAGE_NAME: email-consumer-service
   GITOPS_REPO: brandon-parker-code/email-consumer-service-gitops
-  GITOPS_VALUES_PATH: apps/prod/email-consumer-service/values.yaml
 
 jobs:
   update-gitops:
     runs-on: ubuntu-latest
-    environment: prod
+    environment: ${{ inputs.environment }}
+    env:
+      GITOPS_VALUES_PATH: apps/${{ inputs.environment }}/email-consumer-service/values.yaml
     steps:
       - name: Image tag from commit
         id: meta
@@ -63,6 +73,7 @@ jobs:
         working-directory: gitops
         env:
           TAG: ${{ steps.meta.outputs.tag }}
+          TARGET_ENV: ${{ inputs.environment }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -71,5 +82,5 @@ jobs:
             echo "No GitOps change"
             exit 0
           fi
-          git commit -m "release: ${IMAGE_NAME}:${TAG}"
+          git commit -m "release(${TARGET_ENV}): ${IMAGE_NAME}:${TAG}"
           git push
