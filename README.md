@@ -329,3 +329,5 @@ EmailConsumerService/
 | Messages not sent | Kafka connectivity, topic name, consumer group, API key, SMTP host |
 | Messages retry repeatedly | SendGrid and SMTP both failing; failed messages are not committed to Kafka |
 | Attachments fail | Valid base64, non-empty `fileName`, correct `contentType` |
+
+
